@@ -1,0 +1,5 @@
+$dokka.format:html-v1
+$dokka.linkExtension:html
+$dokka.location:it.unibo////PointingToDeclaration/app/it.unibo/index.html
+$dokka.location:it.unibo//main/#/PointingToDeclaration/app/it.unibo/main.html
+it.unibo
