@@ -1,13 +1,12 @@
 import io.github.andreabrighi.gradle.gitsemver.conventionalcommit.ConventionalCommit
 
 plugins {
-    id("org.danilopianini.git-sensitive-semantic-versioning") version "4.0.2"
-    // Apply the org.jetbrains.kotlin.jvm Plugin to add support for Kotlin.
+    alias(libs.plugins.git.sensitive.semantic.versioning)
     alias(libs.plugins.kotlin.jvm)
-    kotlin("plugin.serialization") version "1.9.25"
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ktlint)
     alias(libs.plugins.detekt)
-    // Apply the application plugin to add support for building a CLI application in Java.
+    alias(libs.plugins.dokka)
     application
 }
 
@@ -16,7 +15,6 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        // Add the plugin to the classpath
         classpath("io.github.andreabrighi:conventional-commit-strategy-for-git-sensitive-semantic-versioning-gradle-plugin:1.0.15")
     }
 }
@@ -27,30 +25,26 @@ gitSemVer {
 }
 
 repositories {
-    // Use Maven Central for resolving dependencies.
     mavenCentral()
 }
 
 dependencies {
-    // Use the Kotlin JUnit 5 integration.
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
-
-    // Use the JUnit 5 integration.
+    // Dependencies for testing
+    testImplementation(libs.kotlin.test.junit5)
     testImplementation(libs.junit.jupiter.engine)
+    testImplementation(libs.konsist)
 
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    // Dependencies for runtime
+    testRuntimeOnly(libs.junit.platform.launcher)
 
-    implementation(libs.ktor.client.core)
-    implementation(libs.ktor.client.cio)
-    implementation(libs.ktor.client.content.negotiation)
-    implementation(libs.ktor.serialization.kotlinx.json)
+    // Dependencies for the application
+    implementation(libs.bundles.ktor)
     implementation(libs.logback.classic)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
-    implementation("io.github.cdimascio:dotenv-kotlin:6.5.0")
-    implementation(libs.ktor.server.core.jvm)
-    implementation(libs.ktor.server.netty.jvm)
-    implementation(libs.ktor.server.content.negotiation.jvm)
+    implementation(libs.dotenv.kotlin)
+    implementation(libs.kmongo.coroutine.serialization)
+    implementation(libs.auth0.jwt)
 }
 
 // Apply a specific Java toolchain to ease working on different environments.
@@ -61,18 +55,25 @@ java {
 }
 
 application {
-    // Define the main class for the application.
-    mainClass = "it.unibo.MainKt"
-}
-
-tasks.named<Test>("test") {
-    // Use JUnit Platform for unit tests.
-    useJUnitPlatform()
+    mainClass = "it.unibo.HelloWorldKt"
 }
 
 detekt {
     buildUponDefaultConfig = true
     config.setFrom("config/detekt/detekt.yaml")
+}
+
+tasks.withType<org.jetbrains.dokka.gradle.DokkaTask>().configureEach {
+    // Disable configuration cache for this task
+    notCompatibleWithConfigurationCache("DokkaTask is not compatible with configuration cache")
+}
+
+tasks.named<Test>("test") {
+    useJUnitPlatform()
+}
+
+tasks.named("build") {
+    dependsOn("ktlintFormat", "detekt", "test")
 }
 
 tasks.register("printVersion") {
@@ -85,7 +86,7 @@ tasks.register("printVersion") {
 tasks.jar {
     archiveFileName.set("app.jar")
     manifest {
-        attributes["Main-Class"] = application.mainClass.get() // or specify your main class directly
+        attributes["Main-Class"] = application.mainClass.get()
     }
 
     // Include all runtime dependencies into the JAR file
@@ -101,4 +102,19 @@ tasks.jar {
 
     // Ensure the JAR is built as a single fat JAR
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks.register<Exec>("dockerBuild") {
+    group = "docker"
+    description = "Builds the Docker image for the application."
+
+    workingDir = file("..")
+    commandLine("docker", "build", "-f", "Dockerfile", "-t", "template-for-kotlin:latest", ".")
+}
+
+tasks.register<Exec>("dockerClean") {
+    group = "docker"
+    description = "Removes dangling Docker images."
+
+    commandLine("docker", "image", "prune", "-f")
 }
